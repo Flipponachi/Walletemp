@@ -15,6 +15,7 @@ using Microsoft.IdentityModel.Tokens;
 using Walletemp.DAL;
 using Walletemp.Dto;
 using Walletemp.Models;
+using Walletemp.Services;
 
 namespace Walletemp.Controllers
 {
@@ -25,19 +26,22 @@ namespace Walletemp.Controllers
         private readonly SignInManager<AppUser> _signInManager;
         private readonly UserManager<AppUser> _userManager;
         private readonly IConfiguration _configuration;
-     private readonly AttendanceContext _context;
+        private readonly IAttendanceRegistrationService _attendanceRegistration;
+        private readonly AttendanceContext _context;
 
         public AccountController(
             UserManager<AppUser> userManager,
             SignInManager<AppUser> signInManager,
             IConfiguration configuration,
+            IAttendanceRegistrationService attendanceRegistration,
            AttendanceContext context
             )
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
-           _context = context;
+            _attendanceRegistration = attendanceRegistration;
+            _context = context;
         }
 
         [HttpPost]
@@ -49,12 +53,11 @@ namespace Walletemp.Controllers
 
             if (result.Succeeded)
             {
-                if (!await _userManager.IsEmailConfirmedAsync(userAcc))
-                {
-                    return BadRequest("You must have a confirmed email to log in.");
-                }
+               var accessToken = await GenerateJwtToken(model.Email, userAcc);
 
-                var accessToken = await GenerateJwtToken(model.Email, userAcc);
+                //Register attendance for a day
+                await _attendanceRegistration.RegistrationForToday(userAcc.Id);
+                //no attendance registration for weekend
                 return Ok(accessToken);
             }
 
@@ -77,9 +80,19 @@ namespace Walletemp.Controllers
                 Fullname = model.Name
             };
             var result = await _userManager.CreateAsync(user, model.Password);
-            await _userManager.AddToRoleAsync(user, "Employee");
+            await _userManager.AddToRoleAsync(user, "Admin");
             if (result.Succeeded)
             {
+                //Create employee record
+
+                var newEmpy = new Employee
+                {
+                    Fullname = model.Name,
+                    UserId = user.Id
+                };
+
+                _context.Employees.Add(newEmpy);
+                await _context.SaveChangesAsync();
                 return Ok("Account Created successfully");
             }
 

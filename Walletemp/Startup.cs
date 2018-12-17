@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Walletemp.DAL;
 using Walletemp.Models;
+using Walletemp.Services;
 
 namespace Walletemp
 {
@@ -31,6 +32,7 @@ namespace Walletemp
             services.AddDbContext<AttendanceContext>(options =>
                 options.UseSqlServer(Configuration.GetConnectionString("AttendanceDatabase")));
 
+            services.AddTransient<IAttendanceRegistrationService, AttendanceRegistrationService>();
 
             services.AddIdentity<AppUser, IdentityRole>(config => { config.SignIn.RequireConfirmedEmail = false; })
                 .AddEntityFrameworkStores<AttendanceContext>()
